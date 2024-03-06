@@ -1,0 +1,263 @@
+---
+title: "advancedgraphingtwo"
+output: html_document
+date: "2024-03-04"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+Okay, let's make some fake data!
+
+
+```{r}
+library(tidyverse)
+library(lubridate)
+library(magrittr)
+```
+
+```{r}
+set.seed(123) # for reproducibility
+```
+
+```{r}
+# Generate fake data
+shopping_data <- tibble(
+  Transaction = 1:2000,
+  Purchase_Date = sample(seq(as.Date('2020-01-01'), as.Date('2023-12-31'), by="day"), 2000, replace = TRUE),
+  Customer_ID = 1000 + seq(1:2000),
+  Gender = sample(c("M", "F"), 2000, replace = TRUE),
+  Marital_Status = sample(c("S, M"), 2000, replace = TRUE),
+  Homeowner = sample(c("Y", "N"), 2000, replace = TRUE),
+  Children = sample(c("Y", "N"), 2000, replace = TRUE),
+  Annual_Income = sample(c("$30,000 - $50,000", "$50,000 - $70,000", "$70,000 - $90,000", "$90,000 - $110,000"), 2000, replace = TRUE),
+  City = sample(c("New York", "Los Angeles", "Chicago", "Houston", "Phoenix", "Philadelphia", 
+                  "San Antonio", "San Diego", "Dallas", "San Jose", "Austin", "Jacksonville", 
+                  "San Francisco", "Indianapolis", "Columbus", "Fort Worth", "Charlotte", 
+                  "Seattle", "Denver", "El Paso", "Detroit", "Washington", "Boston"), 2000, replace = TRUE),
+  State_or_Province = sample(c("NY", "CA", "IL", "TX", "AZ", "PA", "TX", "CA", "TX", "CA", "TX", "FL", 
+                               "CA", "IN", "OH", "TX", "NC", "WA", "CO", "TX", "MI", "DC", "MA"), 2000, replace = TRUE),
+  Country = "USA",
+  Product_Family = sample(rep(c("Electronics", "Clothing", "Books", "Furniture", "Appliances", "Toys"), each = 333), 2000, replace = TRUE),
+  Product_Department = case_when(
+    Product_Family == "Electronics" ~ sample(c("TVs", "Laptops"), 2000, replace = TRUE),
+    Product_Family == "Clothing" ~ sample(c("Shirts", "Pants"), 2000, replace = TRUE),
+    Product_Family == "Books" ~ sample(c("Fiction", "Non-fiction"), 2000, replace = TRUE),
+    Product_Family == "Furniture" ~ sample(c("Sofas", "Tables"), 2000, replace = TRUE),
+    Product_Family == "Appliances" ~ sample(c("Refrigerators", "Microwaves"), 2000, replace = TRUE),
+    Product_Family == "Toys" ~ sample(c("Dolls", "Action Figures"), 2000, replace = TRUE)
+  ),
+  Product_Category = sample(c("High-end", "Mid-range", "Low-end"), 2000, replace = TRUE),
+  Units_Sold = sample(1:10, 2000, replace = TRUE),
+  Revenue = ifelse(City %in% c("New York", "Los Angeles", "Chicago", "San Francisco", "Washington"), 
+                   rnorm(2000, mean = 150, sd = 20), 
+                   ifelse(City %in% c("Houston", "Phoenix", "Philadelphia", "San Antonio", "San Diego"), 
+                          rnorm(2000, mean = 100, sd = 20), 
+                          ifelse(City %in% c("Detroit", "Boston", "Jacksonville", "El Paso"), 
+                          rnorm(2000, mean = 30, sd = 20),
+                                rnorm(2000, mean = 60, sd = 20))))
+)
+
+```
+
+Create a new df with total revenue for each city.  Change the data type of the City column to factor.
+```{r}
+city_rev <- shopping_data %>%
+        group_by(City) %>%
+        summarise(Revenue = sum(Revenue, na.rm = TRUE)) %>%
+        arrange(Revenue) %>%
+        mutate(City = factor(City, levels = .$City))
+```
+
+
+```{r}
+ggplot(city_rev, aes(City, Revenue)) +
+        geom_bar(stat = "identity") +
+        coord_flip()
+```
+If you provide the argument stat=”identity” to geom_bar() then you’re telling R to calculate the sum of the y variable, grouped by the x variable and use bars to display the sums.
+
+
+```{r}
+ggplot(city_rev, aes(Revenue, City)) +
+        geom_point()
+```
+
+Create anothe df with total revenue for each gender in eaxh city. Change the data type of the City column to factor again.
+```{r}
+city_gender_rev <- shopping_data %>%
+        group_by(City, Gender) %>%
+        summarise(Revenue = sum(Revenue, na.rm = TRUE)) %>%
+        ungroup() %>%
+        mutate(City = factor(City, levels = city_rev$City))
+```
+
+
+```{r}
+ggplot(city_gender_rev, aes(City, Revenue, fill = Gender)) +
+        geom_bar(stat = "identity")+
+        coord_flip()
+
+```
+
+```{r}
+ggplot(city_gender_rev, aes(City, Revenue, fill = Gender)) +
+        geom_bar(stat = "identity", position = "dodge") +
+        coord_flip()
+```
+
+```{r}
+ggplot(city_gender_rev, aes(City, Revenue, fill = Gender)) +
+        geom_bar(stat = "identity") +
+        coord_flip() +
+        facet_wrap(~ Gender)
+```
+
+
+```{r}
+ggplot(city_gender_rev, aes(Revenue, City)) +
+        geom_point(aes(color = Gender))
+```
+
+```{r}
+ggplot(city_gender_rev, aes(Revenue, City)) +
+        geom_line(aes(group = City)) +
+        geom_point(aes(color = Gender))
+```
+```{r}
+ggplot(city_gender_rev, aes(Revenue, City, label = round(Revenue, 0))) +
+        geom_line(aes(group = City)) +
+        geom_point(aes(color = Gender)) +
+        geom_text(aes(color = Gender), size = 3)
+```
+
+
+Here we are creating two new dfs just for labels.
+```{r}
+right_label <- city_gender_rev %>%
+        group_by(City) %>%
+        arrange(desc(Revenue)) %>%
+        top_n(1)   #Selects the first value for each city, which is he higher revenue
+
+left_label <- city_gender_rev %>%
+        group_by(City) %>%
+        arrange(desc(Revenue)) %>%
+        slice(2)   #Selects the second value for each city, which is the lower revenue
+
+ggplot(city_gender_rev, aes(Revenue, City)) +
+        geom_line(aes(group = City)) +
+        geom_point(aes(color = Gender), size = 1.5) +
+        geom_text(data = right_label, aes(color = Gender, label = round(Revenue, 0)),
+                  size = 3, hjust = -.5) +
+        geom_text(data = left_label, aes(color = Gender, label = round(Revenue, 0)),
+                  size = 3, hjust = 1.5) +
+        scale_x_continuous(limits = c(-500, 10500))
+```
+
+
+This code is finding cities where there is a significant difference in revenue between genders, by comparing the maximum and minimum revenue for each city and filtering out those where the difference is less than 20%.
+
+Then we are using that new df to edit the left_label and right_label dfs and add some highlighting. 
+
+```{r}
+twenty_diff <- city_gender_rev %>% 
+        spread(Gender, Revenue) %>% 
+        group_by(City) %>% 
+        mutate(Max = max(F, M),
+               Min = min(F, M),
+               Diff = Max / Min - 1) %>% 
+        arrange(desc(Diff)) %>%
+        filter(Diff > .2)
+```
+Explanation of the first section of that code:
+
+1. `spread(Gender, Revenue)`: This function spreads the data frame from long to wide format, where each unique value of `Gender` becomes a new column, and its corresponding `Revenue` value populates that column. 
+2. `group_by(City)`: This function groups the data by the `City` column. This means that all rows with the same city name will be grouped together.
+
+3. `mutate(Max = max(F, M), Min = min(F, M), Diff = Max / Min - 1)`: This line creates three new columns: `Max`, `Min`, and `Diff`. 
+   - `Max = max(F, M)` finds the maximum revenue value among the "Female" (`F`) and "Male" (`M`) columns for each city. 
+   - `Min = min(F, M)` finds the minimum revenue value among the "Female" and "Male" columns for each city. 
+   - `Diff = Max / Min - 1` calculates the difference between the maximum and minimum revenue, normalized by the minimum revenue, and subtracts 1. This gives us the percentage difference between the maximum and minimum revenue.
+
+4. `arrange(desc(Diff))`: This function arranges the rows in descending order based on the `Diff` column, which represents the percentage difference between the maximum and minimum revenue. This means that cities with the largest differences in revenue will appear first.
+
+5. `filter(Diff > .2)`: This function filters the rows to keep only those where the `Diff` column (the percentage difference between maximum and minimum revenue) is greater than 0.2 (20%). This filters out cities where the difference in revenue between genders is less than 20%.
+
+
+```{r}
+# filter the label data frames to only include those cities where the difference exceeds 20%
+right_label <- filter(right_label, City %in% twenty_diff$City)
+left_label <- filter(left_label, City %in% twenty_diff$City)
+
+# filter the main data frame to only include those cities where the 
+# difference exceeds 20%.
+highlight <- filter(city_gender_rev, City %in% twenty_diff$City)
+
+
+#plot the data using alpha of .3 to make everything 30% opaque, then plot highlight data over that at 100% opacity
+ggplot(city_gender_rev, aes(Revenue, City)) +
+        geom_line(aes(group = City), alpha = .3) +
+        geom_point(aes(color = Gender), size = 1.5, alpha = .3) +
+        geom_line(data = highlight, aes(group = City)) +
+        geom_point(data = highlight, aes(color = Gender), size = 2) +
+        geom_text(data = right_label, aes(color = Gender, label = round(Revenue, 0)),
+                  size = 3, hjust = -.5) +
+        geom_text(data = left_label, aes(color = Gender, label = round(Revenue, 0)),
+                  size = 3, hjust = 1.5) +
+        scale_x_continuous(limits = c(-500, 10500))
+```
+
+
+```{r}
+# create a new label data frame
+plot_label <- twenty_diff %>%
+        select(City, Revenue = Max, Diff) %>%
+        right_join(right_label)
+
+p <- ggplot(city_gender_rev, aes(Revenue, City)) +
+        geom_line(aes(group = City), alpha = .3) +
+        geom_point(aes(color = Gender), size = 1.5, alpha = .3) +
+        geom_line(data = highlight, aes(group = City)) +
+        geom_point(data = highlight, aes(color = Gender), size = 2) +
+        geom_text(data = plot_label, aes(color = Gender, 
+                                         label = paste0("+", scales::percent(round(Diff, 2)))),
+                  size = 3, hjust = -.5)
+
+p
+
+```
+
+```{r, fig.height=10, fig.width=6}
+
+p + scale_color_discrete(labels = c("Female", "Male")) +
+        scale_x_continuous(labels = scales::dollar, expand = c(0.02, 0), 
+                           limits = c(0, 8000),
+                           breaks = seq(0, 8000, by = 2000)) +
+        scale_y_discrete(expand = c(.02, 0)) +
+        labs(title = "Total Revenue by City and Gender",
+             subtitle = "Out of 23 cities, eleven locations experience a 20% or greater difference \nin revenue generated by males versus females. Chicago experiences the \ngreatest difference with females generating 86% more revenue than males.") +
+        theme_minimal() +
+        theme(axis.title = element_blank(),
+              panel.grid.major.x = element_blank(),
+              panel.grid.minor = element_blank(),
+              legend.title = element_blank(),
+              legend.justification = c(0, 1), 
+              legend.position = c(.1, 1.075),
+              legend.background = element_blank(),
+              legend.direction="horizontal",
+              text = element_text(family = "Cambria"),
+              plot.title = element_text(size = 20, margin = margin(b = 10)),
+              plot.subtitle = element_text(size = 10, color = "darkslategrey", margin = margin(b = 25)),
+              plot.caption = element_text(size = 8, margin = margin(t = 10), color = "grey70", hjust = 0))
+
+```
+
+```{r}
+library(extrafont)
+font_import()
+```
+```{r}
+loadfonts(device = "win")
+```
